@@ -1,0 +1,297 @@
+\let\negmedspace\undefined
+      % for \toprule \midrule \bottomrule
+
+\let\negthickspace\undefined
+\documentclass[journal]{IEEEtran}
+\usepackage[a5paper, margin=10mm, onecolumn]{geometry}
+\usepackage{tfrupee}
+\usepackage{csvsimple}     % <-- provides \csvautobooktabular
+\usepackage[utf8]{inputenc}
+\usepackage{float}    % for [H]
+\usepackage{placeins} % for \FloatBarrier (optional but helpful)
+
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{csvsimple,booktabs}
+\setlength{\headheight}{1cm}
+\setlength{\headsep}{0mm}
+% Preamble additions (if not already present)
+\usepackage{amsmath}
+\usepackage{siunitx}   % for units like \SI{5.0}{V}
+\usepackage{enumitem}  % for compact lists
+
+\usepackage{gvv-book}
+\usepackage{gvv}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{txfonts}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{gensymb}
+\usepackage{comment}
+\usepackage[breaklinks=true]{hyperref}
+\usepackage{tkz-euclide}
+
+\graphicspath{{figs/}}
+\usepackage{color}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{calc}
+\usepackage{multirow}
+\usepackage{hhline}
+\usepackage{ifthen}
+\usepackage{lscape}
+\usepackage{circuitikz}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% Make \emph use bold (not italics)
+\DeclareTextFontCommand{\emph}{\bfseries}
+
+\begin{document}
+\title{Software Project}
+\author{EE25BTECH11007- Aniket }
+\maketitle
+{\let\newpage\relax\maketitle}
+
+\setlength{\intextsep}{10pt}
+\section*{(1) Summary of Strang’s SVD video}
+Let $A\in\mathbb{R}^{m\times n}$. The singular value decomposition (SVD) factors any matrix into
+\[
+A = U\,\Sigma\,V^{\top},\qquad
+U\in\mathbb{R}^{m\times m},~V\in\mathbb{R}^{n\times n}~\text{orthonormal},~
+\Sigma=\mathrm{diag}(\sigma_1\ge\dots\ge\sigma_r>0),
+\]
+where $r=\mathrm{rank}(A)$. Geometrically, $V$ rotates (or reflects) coordinates to the directions of action of $A$, $\Sigma$ stretches by the nonnegative singular values, and $U$ rotates to the output axes. Strang emphasizes:
+
+\begin{itemize}
+  \item $A^{\top}A$ is symmetric positive semidefinite. Its eigenpairs satisfy $A^{\top}A\,v_i=\sigma_i^2 v_i$; thus $\sigma_i=\sqrt{\lambda_i(A^{\top}A)}$ and $u_i=\frac{1}{\sigma_i}A v_i$.
+ 
+  \item Formula Given
+  \[
+  A_k=\sum_{i=1}^k \sigma_i u_i v_i^{\top}
+  \]
+ 
+\end{itemize}
+
+\section*{(2) One-sided Jacobi SVD: math and pseudocode}
+\textbf{GENERAL IDEA:} Orthogonalize the columns of $A$ by applying Givens rotationson the right so that $A^{\top}A$ becomes (nearly) diagonal \emph{without forming it}. For a column pair $(p,q)$, form their Gram matrix
+\[
+G = \begin{bmatrix}\alpha & \gamma\\ \gamma & \beta\end{bmatrix},
+\quad \alpha=\langle a_p,a_p\rangle,\;\beta=\langle a_q,a_q\rangle,\;\gamma=\langle a_p,a_q\rangle.
+\]
+Choose a plane rotation
+\[
+R=\begin{bmatrix}c & s\\ -s & c\end{bmatrix},\qquad
+t=\frac{\beta-\alpha}{2\gamma},\quad
+\tau=\mathrm{sign}(t)\big/(|t|+\sqrt{1+t^2}),\quad
+c=\frac{1}{\sqrt{1+\tau^2}},\; s=c\,\tau,
+\]
+that diagonalizes $R^{\top} G R$. Apply this \emph{on the right} to the two columns:
+\[
+\begin{bmatrix}a_p & a_q\end{bmatrix} \leftarrow
+\begin{bmatrix}a_p & a_q\end{bmatrix}
+\begin{bmatrix}c & s\\ -s & c\end{bmatrix},
+\qquad
+V \leftarrow V
+\begin{bmatrix}c & s\\ -s & c\end{bmatrix}
+\text{ on columns }(p,q).
+\]
+After enough sweeps over all pairs $(p,q)$, the off-diagonal entries of $A^{\top}A$ are tiny, so the columns $\{a_j\}$ are mutually orthogonal. Then
+\[
+\sigma_j=\|a_j\|_2,\qquad u_j=\frac{a_j}{\sigma_j},\qquad \text{and the columns of }V \text{ are the } v_j.
+\]
+\subsection*{Constructing $U,\Sigma,V$ from one–sided Jacobi and ordering}
+
+After the final sweep, the method has applied a right orthogonal transform $V$
+so that
+\[
+A_{\mathrm{final}} \;=\; A\,V \;=\; [\,a'_1~a'_2~\dots~a'_n\,],
+\]
+whose columns are (numerically) mutually orthogonal.
+
+\paragraph{Column–norms–squared vector and ordering.}
+Compute
+\[
+d_j \;=\;\|a'_j\|_2^2,\qquad \mathbf{d}=[d_1,\ldots,d_n].
+\]
+Let $\pi$ be a permutation that sorts $\mathbf{d}$ in \emph{descending} order:
+$d_{\pi(1)}\ge d_{\pi(2)}\ge\cdots\ge d_{\pi(n)}$,
+and let $\Pi$ be the associated permutation matrix.
+Permute the columns of $A_{\mathrm{final}}$ and $V$ simultaneously:
+\[
+\widetilde{A}\;=\;A_{\mathrm{final}}\Pi,\qquad \widetilde{V}\;=\;V\Pi.
+\]
+
+\paragraph{Forming $\Sigma$, $U$, and (optionally) truncation.}
+Define singular values by
+\[
+\sigma_j \;=\; \|\,\widetilde{a}_j\,\|_2 \;=\; \sqrt{d_{\pi(j)}} \quad (j=1,\dots,n),
+\]
+drop any $j$ with $\sigma_j\approx 0$, and set
+\[
+\Sigma=\operatorname{diag}(\sigma_1,\dots,\sigma_r),\qquad
+U=\big[\,\widetilde{a}_1/\sigma_1~\cdots~\widetilde{a}_r/\sigma_r\,\big],\qquad
+V=\widetilde{V}.
+\]
+Because the columns of $\widetilde{A}$ are orthogonal, $U^\top U=I_r$.  The SVD is
+\[
+A \;=\; U\,\Sigma\,V^\top .
+\]
+For the truncated SVD, keep only the first $k$ indices:
+\[
+U_k=\big[\,\widetilde{a}_1/\sigma_1~\cdots~\widetilde{a}_k/\sigma_k\,\big],\quad
+\Sigma_k=\operatorname{diag}(\sigma_1,\dots,\sigma_k),\quad
+V_k=\widetilde{V}(:,1\!:\!k).
+\]
+
+
+
+\paragraph{Pseudocode (one-sided Jacobi, truncated to top $k$).}
+\begin{enumerate}
+  \item Input: $A\in\mathbb{R}^{m\times n}$, target $k$, tolerance \texttt{tol}, max sweeps \texttt{S}.
+  \item Set $V\leftarrow I_n$.
+  \item For $s=1,\dots,S$ (a ``sweep''):
+  \begin{enumerate}
+    \item For all pairs $1\le p<q\le n$:
+    \begin{enumerate}
+      \item $\alpha\leftarrow\langle a_p,a_p\rangle$, $\beta\leftarrow\langle a_q,a_q\rangle$, $\gamma\leftarrow\langle a_p,a_q\rangle$.
+      \item If $|\gamma|$ is small relative to $\sqrt{\alpha\beta}$, continue.
+      \item Compute $(c,s)$ using the formulas above.
+      \item Update the two columns of $A$: $(a_p,a_q)\leftarrow(a_p,a_q)\,\begin{bmatrix}c&s\\-s&c\end{bmatrix}$.
+      \item Accumulate in $V$: $(v_p,v_q)\leftarrow(v_p,v_q)\,\begin{bmatrix}c&s\\-s&c\end{bmatrix}$.
+    \end{enumerate}
+  \end{enumerate}
+  \item If convergence test satisfied, break.
+  \item Compute $\sigma_j=\|a_j\|_2$. Sort indices by decreasing $\sigma_j$.
+  \item Output $U_k=[a_{j_1}/\sigma_{j_1}\;\cdots\;a_{j_k}/\sigma_{j_k}]$, $\Sigma_k=\mathrm{diag}(\sigma_{j_1},\dots,\sigma_{j_k})$, $V_k=[v_{j_1}\;\cdots\;v_{j_k}]$.
+\end{enumerate}
+
+\section*{(3) Algorithm comparison and choice}
+\textbf{Golub–Reinsch (bidiagonalization + QR).} Householder reductions drive $A$ to bidiagonal form in $\mathcal{O}(mn^2)$ (for $m\ge n$), then a specialized QR iteration diagonalizes it in $\mathcal{O}(n^3)$. This is the standard high-performance approach (LAPACK), very fast and robust, but the implementation from scratch is longer and uses Level-2/3 BLAS-style kernels.
+
+\textbf{Randomized SVD (RSVD).} Projects $A$ to a low-dimensional subspace via random sketching, then computes a small SVD. Excellent for very large, sparse, or data-streaming settings; accuracy depends on oversampling/power iters. Requires more moving parts (random matrices, QR/LU) and careful parameter choices.
+
+\textbf{Power/Block Orthogonal Iteration.} Iteratively applies $A$ and $A^{\top}$ with reorthogonalization (e.g., MGS). Simple and effective for leading $k$, but convergence slows when singular values are clustered; maintaining orthogonality needs care.
+
+\textbf{One-sided Jacobi (used here).}
+\begin{itemize}
+  \item \emph{Pros:} conceptually clear (implicitly diagonalizes $A^{\top}A$), extremely good orthogonality of $U,V$, embarrassingly parallel over column pairs, and easy to truncate—after convergence, just sort column norms. Implementation is compact and uses only dot products and plane rotations (good for a from-scratch C codebase with no LAPACK/BLAS).
+  \item \emph{Cons:} higher operation count per level of accuracy than Golub–Reinsch; per-sweep cost $\mathcal{O}(mn^2)$ with nontrivial constants, so full SVD on large square images is slower. 
+\end{itemize}
+\textbf{Why this choice.} For this assignment’s goals (clarity, numerical stability, minimal dependencies, and easy top-$k$ reconstruction for images), one-sided Jacobi is a great fit. It delivers highly orthogonal singular vectors and accurate singular values; truncation to different $k$ just selects the largest column norms at the end, and the code stays short and dependency-free.
+
+\section*{(4) Discussion of trade–offs and reflections on implementation choice}
+
+\subsection*{What I optimized for}
+My priorities were: (i) \emph{orthogonality and numerical clarity} (easy to explain and verify), (ii) \emph{few dependencies} (no BLAS/LAPACK), and (iii) \emph{simple truncation to top-$k$} for image compression. The one–sided Jacobi method aligns well with all three.
+
+\subsection*{Accuracy vs.\ speed}
+\begin{itemize}
+  \item \textbf{Accuracy/orthogonality.} Jacobi implicitly diagonalizes $A^{\top}A$ by right–rotations, yielding very small off–diagonals and highly orthogonal $U,V$ in practice. This is excellent for downstream tasks (e.g., stability of $U_k\Sigma_kV_k^{\top}$ and error analysis).
+  \item \textbf{Runtime.} A sweep processes all $\binom{n}{2}$ column pairs and touches $m$ rows $\Rightarrow$ about $\mathcal{O}(mn^2)$ work per sweep (for $m\!\ge\!n$). Convergence usually needs multiple sweeps. For square images, this is slower than bidiagonalization\,$+$\,QR (Golub–Reinsch), which attains near–optimal constants in tuned libraries.
+  \item \textbf{When it shines.} Small–to–medium $n$ (typical lab images), when code simplicity and robustness matter more than peak speed; when exact orthogonality is valued (teaching, diagnostics).
+\end{itemize}
+
+\subsection*{Memory, implementation complexity, and portability}
+\begin{itemize}
+  \item \textbf{Memory.} I store $A$ and accumulate $V$; $U$ is formed at the end by normalizing columns of $A$. Peak memory is $\mathcal{O}(mn+n^2)$ (if all of $V$ is kept). For \emph{truncated} output, I can retain only the $k$ most energetic columns after sorting, reducing storage to $k(m+n+1)$ numbers.
+  \item \textbf{Complexity of code.} The core is dot products and $2\times 2$ Givens rotations, so the implementation is compact, branch–light, and dependency–free. This also makes it easy to reason about correctness and add instrumentation (off–diagonal norms, sweep counters).
+  \item \textbf{Portability.} Uses only standard C and \texttt{math.h}; no platform–specific intrinsics. That meets the assignment’s “barebones” requirement.
+\end{itemize}
+
+\subsection*{Convergence control and tuning}
+\begin{itemize}
+  \item \textbf{Stopping rules.} I use a relative orthogonality test 
+  \[
+    \max_{p<q}\frac{|\langle a_p,a_q\rangle|}{\|a_p\|_2\,\|a_q\|_2}\le \text{tol},
+  \]
+  or a cap on the number of sweeps. Tight tolerances improve orthogonality but increase runtime.
+  \item \textbf{Pair ordering.} I used cyclic $(p,q)$ pairs. Greedy/adaptive schedules (pick the largest $|\langle a_p,a_q\rangle|$) can reduce sweeps but add overhead.
+  \item \textbf{Scaling.} Column–wise scaling (or simple pre–normalization) can help when columns have very different norms, but I avoided extra passes to keep code minimal.
+\end{itemize}
+
+
+
+\subsection*{Numerical stability}
+\begin{itemize}
+  \item \textbf{Pros.} Jacobi never forms $A^{\top}A$ explicitly, avoiding the squaring of condition numbers that can hurt eigen–based methods. Givens rotations are norm–preserving, which limits error growth and preserves column energies.
+  \item \textbf{Cons.} Very clustered singular values can slow convergence (more sweeps). In such cases, Golub–Reinsch or block power methods with robust reorthogonalization may reach the same accuracy faster.
+\end{itemize}
+
+
+
+\subsection*{When I would choose a different method}
+\begin{itemize}
+  \item \textbf{Large square/tall problems with strict time budgets:} Prefer Golub–Reinsch (LAPACK) for full SVD, or \emph{randomized SVD} / block power iterations for top-$k$ only.
+  \item \textbf{Very large sparse matrices / streaming data:} Randomized methods (with power iterations) are usually superior in wall time and memory.
+\end{itemize}
+
+\section*{(4) Reconstructed Image}
+1)EINSTEIN \\
+2) GLOBE\\
+3) GREYSCALE\\
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{einstein_svd_k1.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{einstein_svd_k10.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{einstein_svd_k50 (1).png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/globesvd1.jpg}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/globesvd10.jpg}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/globesvd100.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/gscale_1.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/gscale_30.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{figs/gscale_100.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\end{document}
